@@ -50,6 +50,7 @@ export default function AuthGate({ children }) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f7', padding: 20, fontFamily: '-apple-system, system-ui, sans-serif' }}>
         <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: 360, background: '#fff', borderRadius: 20, padding: 28, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <img src="/logo.png" alt="" style={{ width: 56, height: 56, borderRadius: 14, marginBottom: 14 }} />
           <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>租户管理</h1>
           <p style={{ fontSize: 13, color: '#888', marginBottom: 20 }}>{mode === 'signin' ? '登录以同步你的数据' : '创建账号'}</p>
           <input type="email" required placeholder="邮箱" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
