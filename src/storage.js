@@ -1,51 +1,50 @@
-// Polyfills window.storage using the browser's localStorage, matching the
-// { get, set, delete, list } shape App.jsx already calls. App.jsx itself
-// needs ZERO changes — this file is the only thing that makes it work
-// outside the Claude artifact sandbox.
-//
-// LIMITATION: localStorage is per-browser, per-device, ~5-10MB total, and is
-// wiped if the user clears site data. There is no cloud backup and no sync
-// across devices. Fine for a single-device MVP; not fine as the long-term
-// system of record for a lending business.
+import { supabase } from './supabaseClient.js';
 
-const DB_KEY = 'tenant-mgmt::db';
+// Same shape as the old localStorage adapter (get/set/delete/list), so App.jsx
+// is completely untouched. Data now lives in Supabase Postgres, scoped per
+// logged-in user via Row Level Security (see supabase-setup.sql) -- that RLS
+// policy is what actually protects the data, not this file.
 
-function readAll() {
-  try {
-    const raw = localStorage.getItem(DB_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch (e) {
-    return {};
-  }
-}
-
-function writeAll(store) {
-  localStorage.setItem(DB_KEY, JSON.stringify(store));
+async function getUserId() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+  return session.user.id;
 }
 
 const storage = {
   async get(key) {
-    const store = readAll();
-    if (!(key in store)) throw new Error('key not found: ' + key);
-    return { key, value: store[key] };
+    const owner_id = await getUserId();
+    const { data, error } = await supabase
+      .from('kv_store')
+      .select('value')
+      .eq('owner_id', owner_id)
+      .eq('key', key)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('key not found: ' + key);
+    return { key, value: data.value };
   },
   async set(key, value) {
-    const store = readAll();
-    store[key] = value;
-    writeAll(store);
+    const owner_id = await getUserId();
+    const { error } = await supabase
+      .from('kv_store')
+      .upsert({ owner_id, key, value, updated_at: new Date().toISOString() }, { onConflict: 'owner_id,key' });
+    if (error) throw error;
     return { key, value };
   },
   async delete(key) {
-    const store = readAll();
-    const existed = key in store;
-    delete store[key];
-    writeAll(store);
-    return { key, deleted: existed };
+    const owner_id = await getUserId();
+    const { error } = await supabase.from('kv_store').delete().eq('owner_id', owner_id).eq('key', key);
+    if (error) throw error;
+    return { key, deleted: true };
   },
   async list(prefix) {
-    const store = readAll();
-    const keys = Object.keys(store).filter((k) => !prefix || k.startsWith(prefix));
-    return { keys };
+    const owner_id = await getUserId();
+    let query = supabase.from('kv_store').select('key').eq('owner_id', owner_id);
+    if (prefix) query = query.like('key', prefix + '%');
+    const { data, error } = await query;
+    if (error) throw error;
+    return { keys: (data || []).map((r) => r.key) };
   },
 };
 
