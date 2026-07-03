@@ -276,16 +276,56 @@ function TenantRow({ tenant, onClick, theme }) {
 function Sheet({ title, onClose, theme, children }) {
   const c = THEME[theme];
   const [show, setShow] = useState(false);
+  const [dragY, setDragY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const startYRef = useRef(0);
+  const draggedRef = useRef(false);
+
   useEffect(() => { const t = setTimeout(() => setShow(true), 10); return () => clearTimeout(t); }, []);
   const handleClose = () => { setShow(false); setTimeout(onClose, 180); };
+
+  const onTouchStart = (e) => {
+    startYRef.current = e.touches[0].clientY;
+    draggedRef.current = true;
+    setDragging(true);
+  };
+  const onTouchMove = (e) => {
+    if (!draggedRef.current) return;
+    const delta = e.touches[0].clientY - startYRef.current;
+    if (delta > 0) setDragY(delta);
+  };
+  const onTouchEnd = () => {
+    draggedRef.current = false;
+    setDragging(false);
+    if (dragY > 110) {
+      handleClose();
+    } else {
+      setDragY(0);
+    }
+  };
+
+  const translateY = !show ? '100%' : dragY + 'px';
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <div onClick={handleClose} className={'absolute inset-0 bg-black transition-opacity duration-200 ' + (show ? 'opacity-40' : 'opacity-0')} />
-      <div className={'relative w-full max-w-md ' + c.sheetBg + ' rounded-t-3xl max-h-screen overflow-y-auto transition-transform duration-200 ease-out ' + (show ? 'translate-y-0' : 'translate-y-full')}>
-        <div className={'sticky top-0 ' + c.sheetBg + ' border-b ' + c.border + ' px-5 py-4 flex items-center justify-between rounded-t-3xl z-10'}>
-          <button onClick={handleClose} className={c.accent + ' text-sm font-medium w-12 text-left'}>取消</button>
-          <h2 className={'font-semibold ' + c.text}>{title}</h2>
-          <div className="w-12" />
+      <div
+        style={{ transform: 'translateY(' + translateY + ')', transition: dragging ? 'none' : 'transform 200ms ease-out' }}
+        className={'relative w-full max-w-md ' + c.sheetBg + ' rounded-t-3xl max-h-screen overflow-y-auto'}
+      >
+        <div
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+          className={'sticky top-0 ' + c.sheetBg + ' border-b ' + c.border + ' rounded-t-3xl z-10'}
+        >
+          <div className={'mx-auto mt-2 mb-1 h-1.5 w-10 rounded-full ' + c.chipBg} />
+          <div className="px-5 py-3 flex items-center justify-between">
+            <button onClick={handleClose} className={c.accent + ' text-sm font-medium w-12 text-left'}>取消</button>
+            <h2 className={'font-semibold ' + c.text}>{title}</h2>
+            <div className="w-12" />
+          </div>
         </div>
         <div className="p-5 pb-8">{children}</div>
       </div>
@@ -819,7 +859,7 @@ export default function App() {
   return (
     <div className={c.pageBg + ' min-h-screen transition-colors duration-300'}>
       <div className={'max-w-md mx-auto min-h-screen ' + c.appBg + ' relative pb-24 shadow-xl'}>
-        <div className={'sticky top-0 z-30 ' + c.appBg + ' border-b ' + c.border + ' px-5 pt-6 pb-4 flex items-center justify-between'}>
+        <div style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }} className={'sticky top-0 z-30 ' + c.appBg + ' border-b ' + c.border + ' px-5 pb-4 flex items-center justify-between'}>
           <h1 className={'text-2xl font-bold ' + c.text}>
             {activeTab === 'home' ? '概览' : activeTab === 'tenants' ? '租户' : '设置'}
           </h1>
@@ -971,7 +1011,7 @@ export default function App() {
         )}
 
         <div className="fixed bottom-0 inset-x-0 z-30">
-          <div className={'max-w-md mx-auto ' + c.appBg + ' border-t ' + c.border + ' px-6 py-2.5 flex items-center justify-around'}>
+          <div style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} className={'max-w-md mx-auto ' + c.appBg + ' border-t ' + c.border + ' px-6 pt-2.5 flex items-center justify-around'}>
             {[
               { id: 'home', label: '首页', Icon: Home },
               { id: 'tenants', label: '租户', Icon: Users },
