@@ -119,6 +119,20 @@ function getMonthInfo(tenant, year, monthIndex) {
   return { key, inLease: true, due, rec, state };
 }
 
+/* Aggregate expected/collected rent across all tenants for an arbitrary month.
+   Reuses getMonthInfo so it can never drift from the per-tenant/per-row logic. */
+function getMonthTotals(tenants, year, monthIndex) {
+  let expected = 0, collected = 0, activeCount = 0, paidCount = 0;
+  tenants.forEach((t) => {
+    const info = getMonthInfo(t, year, monthIndex);
+    if (!info.inLease) return;
+    activeCount++;
+    expected += Number(t.rentAmount || 0);
+    if (info.rec.paid) { collected += Number(t.rentAmount || 0); paidCount++; }
+  });
+  return { expected, collected, activeCount, paidCount };
+}
+
 /* Tenant-level status, derived from the SAME getMonthInfo used by the grid.
    'upcoming'  = hasn't moved in yet (today < leaseStart)
    'settling'  = has moved in, but the first full billing month hasn't started yet
@@ -174,6 +188,46 @@ function RadialGauge({ percent, theme }) {
         <span className={'text-xl font-bold ' + THEME[theme].text}>{Math.round(clamped)}%</span>
         <span className={'text-xs ' + THEME[theme].textMuted}>收缴率</span>
       </div>
+    </div>
+  );
+}
+
+function MonthlyIncomeCard({ tenants, theme }) {
+  const c = THEME[theme];
+  const today = new Date();
+  const initial = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const [year, setYear] = useState(initial.getFullYear());
+  const [month, setMonth] = useState(initial.getMonth());
+  const isAtMax = year === today.getFullYear() && month === today.getMonth();
+
+  const goPrev = () => { if (month === 0) { setYear((y) => y - 1); setMonth(11); } else setMonth((m) => m - 1); };
+  const goNext = () => { if (isAtMax) return; if (month === 11) { setYear((y) => y + 1); setMonth(0); } else setMonth((m) => m + 1); };
+
+  const totals = getMonthTotals(tenants, year, month);
+  const rate = totals.expected > 0 ? (totals.collected / totals.expected) * 100 : 0;
+
+  return (
+    <div className={c.cardBg + ' rounded-2xl p-5 border ' + c.border}>
+      <div className="flex items-center justify-between mb-4">
+        <p className={'text-xs font-medium ' + c.textMuted}>月度收入查询</p>
+        <div className="flex items-center gap-3">
+          <button onClick={goPrev} className={c.textMuted}><ChevronLeft size={16} /></button>
+          <span className={'text-sm font-semibold ' + c.text}>{year}年{month + 1}月</span>
+          <button onClick={goNext} disabled={isAtMax} className={c.textMuted + (isAtMax ? ' opacity-30' : '')}><ChevronRight size={16} /></button>
+        </div>
+      </div>
+      {totals.activeCount === 0 ? (
+        <p className={'text-sm ' + c.textMuted}>该月没有生效中的租户</p>
+      ) : (
+        <div className="flex items-center gap-5">
+          <RadialGauge percent={rate} theme={theme} />
+          <div className="flex-1 space-y-1.5 min-w-0">
+            <p className={'text-xs ' + c.textMuted}>应收</p>
+            <p className={'text-lg font-bold ' + c.text}>{formatMYR(totals.expected)}</p>
+            <p className={'text-xs ' + c.textMuted + ' pt-1'}>已收 {formatMYR(totals.collected)} · {totals.paidCount}/{totals.activeCount} 户</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -806,6 +860,8 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            {totalTenants > 0 && <MonthlyIncomeCard tenants={tenants} theme={theme} />}
 
             {expiringList.length > 0 && (
               <div>
