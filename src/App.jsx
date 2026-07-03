@@ -642,6 +642,7 @@ export default function App() {
   const [filter, setFilter] = useState('all');
   const [sheet, setSheet] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const [toast, setToast] = useState('');
   const [ready, setReady] = useState(false);
   const loadedRef = useRef(false);
@@ -671,6 +672,11 @@ export default function App() {
   useEffect(() => { if (loadedRef.current) window.storage.set(STORAGE_KEY_THEME, theme).catch(() => {}); }, [theme]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2000); };
+
+  const handleSignOut = async () => {
+    try { await window.auth.signOut(); } catch (e) {}
+    // AuthGate listens for the auth state change and will swap back to the login screen itself.
+  };
 
   const handleSaveTenant = (data) => {
     if (sheet && sheet.type === 'edit') {
@@ -876,7 +882,20 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <p className={'text-xs text-center pt-4 ' + c.textMuted}>租户管理 · v1.2</p>
+            <div>
+              <h3 className={'text-xs font-semibold uppercase tracking-wide mb-2 px-1 ' + c.textMuted}>账号</h3>
+              <div className={c.cardBg + ' rounded-2xl border ' + c.border + ' p-4'}>
+                {confirmLogout ? (
+                  <div className="flex items-center gap-2">
+                    <button onClick={handleSignOut} className="flex-1 text-sm font-semibold text-white bg-rose-500 rounded-xl py-2.5">确认退出登录</button>
+                    <button onClick={() => setConfirmLogout(false)} className={'flex-1 text-sm font-semibold ' + c.textSubtle + ' ' + c.hoverBg + ' rounded-xl py-2.5'}>取消</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setConfirmLogout(true)} className="text-sm font-medium text-rose-500">退出登录</button>
+                )}
+              </div>
+            </div>
+            <p className={'text-xs text-center pt-4 ' + c.textMuted}>租户管理 · v1.3</p>
           </div>
         )}
 

@@ -50,6 +50,9 @@ const storage = {
 
 if (typeof window !== 'undefined') {
   window.storage = storage;
+  window.auth = {
+    signOut: () => supabase.auth.signOut(),
+  };
 }
 
 export default storage;
